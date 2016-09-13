@@ -14,6 +14,7 @@ if [ -z "$QVALS" ]; then
 else
     read -a RUNVALS <<< $QVALS
 fi
+echo "INFO: RUNVALS="${RUNVALS[@]}
 
 NTHREADS=$(($(nproc)-1))
 BASEDIR=$(readlink -f "$(dirname "$0")")
