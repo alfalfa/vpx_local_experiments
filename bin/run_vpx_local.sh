@@ -1,9 +1,5 @@
 #!/bin/bash
 
-if ! which time &>/dev/null ; then
-    echo "ERROR: cannot find \`time\`"
-    exit 1
-fi
 if ! which vpxenc &>/dev/null ; then
     echo "ERROR: cannot find \`vpxenc\`"
     exit 1
