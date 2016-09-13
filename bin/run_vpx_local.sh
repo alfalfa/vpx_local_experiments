@@ -7,6 +7,7 @@ DFL_RUN=0
 DFL_MULTI=0
 DFL_BUCKET=excamera-us-east-1
 DFL_S3DIR=sintel-serial
+DFL_INSTNUM=0
 
 if [ "$1" = "-h" ]; then
     echo "Usage: $0"
@@ -48,7 +49,7 @@ fi
 showinfo "QVALS" "${RUNVALS[@]}"
 
 ### set values from the environment
-for i in MEMDIR RES RUN MULTI BUCKET S3DIR; do
+for i in MEMDIR RES RUN MULTI BUCKET S3DIR INSTNUM; do
     setwithdefault $i
 done
 
@@ -59,6 +60,14 @@ else
     echo "ERROR: Cannot write to MEMDIR=$MEMDIR"
     exit 1
 fi
+
+### set xterm title
+if [ "$MULTI" != 0 ]; then
+    MSTR="-multi"
+else
+    MSTR=""
+fi
+printf "\033]0;%02d-sintel-${RES}-${RUNVALS[@]}${MSTR}-${RUN}\a" "$INSTNUM"
 
 ### make sure we can find all the executables
 if ! which vpxenc &>/dev/null ; then
