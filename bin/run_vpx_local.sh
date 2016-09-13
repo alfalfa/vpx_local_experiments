@@ -67,7 +67,7 @@ if [ "$MULTI" != 0 ]; then
 else
     MSTR=""
 fi
-printf "\033]0;%02d-sintel-${RES}-${RUNVALS[@]}${MSTR}-${RUN}\a" "$INSTNUM"
+echo -en "\033]0;"$(printf "%02d" $INSTNUM)"-sintel-${RES}-${RUNVALS[@]}${MSTR}-${RUN}\a"
 
 ### make sure we can find all the executables
 if ! which vpxenc &>/dev/null ; then
