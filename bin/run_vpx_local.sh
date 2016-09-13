@@ -1,38 +1,58 @@
 #!/bin/bash
 
-if ! which vpxenc &>/dev/null ; then
-    echo "ERROR: cannot find \`vpxenc\`"
-    exit 1
-fi
+DFL_RUNVALS=(0 4 7 11 14 18 21 25 28 32 35 39 42 46 49 53 56 60 63)
+DFL_MEMDIR=/dev/shm
+DFL_RES=1k
+DFL_RUN=0
+DFL_MULTI=0
+DFL_BUCKET=excamera-us-east-1
+DFL_S3DIR=sintel-serial
 
-if [ -z "$QVALS" ]; then
-    RUNVALS=(0 4 7 11 14 18 21 25 28 32 35 39 42 46 49 53 56 60 63)
-else
-    read -a RUNVALS <<< $QVALS
+if [ "$1" = "-h" ]; then
+    echo "Usage: $0"
+    echo "Environment variables:"
+    echo "  QVALS='0 1 2 3'         runs with cq=0, 1, 2, 3 (default: '"${DFL_RUNVALS[@]}"')"
+    echo "  MEMDIR=/path/to/shm     path to temp space (default: '"$DFL_MEMDIR"')"
+    echo "  RES=<1k | 4k>           run 1k or 4k (default: '"$DFL_RES"')"
+    echo "  RUN=n                   add a run number tag (default: '"$DFL_RUN"')"
+    echo "  MULTI=<0 | 1>           run vpxenc multi-threaded (default: '"$DFL_MULTI"')"
+    echo "  BUCKET=mybucket         s3 bucket for uploads (default: '"$DFL_BUCKET"')"
+    echo "  S3DIR=mykey             s3 dirname for uploads (default: '"$DFL_S3DIR"')"
+    exit 0
 fi
-echo "INFO: RUNVALS="${RUNVALS[@]}
 
 NTHREADS=$(($(nproc)-1))
 BASEDIR=$(readlink -f "$(dirname "$0")")
 
-if [ ! -x "$BASEDIR"/../daala_tools/dump_ssim ]; then
-    echo "You need to build the daala_tools submodule first!"
-    exit 1
-fi
+function showinfo {
+    echo "INFO: "$1"="$2
+}
 
-if [ -z "$OUTDIR" ]; then
-    OUTDIR=/mnt/exc_scratch
-fi
-if touch "$OUTDIR"/testfile_ &>/dev/null ; then
-    rm "$OUTDIR"/testfile_
-else
-    echo "ERROR: Cannot write to OUTDIR=$OUTDIR"
-    exit 1
-fi
+function setwithdefault {
+    eval CMDLINEVAL=\${$1}
+    if [ -z "$CMDLINEVAL" ]; then
+        eval $1=\${DFL_$1}
+    else
+        eval $1=$CMDLINEVAL
+    fi
+    eval showinfo $1 \$$1
+}
 
-if [ -z "$MEMDIR" ]; then
-    MEMDIR=/dev/shm
+### process QVALS into an array
+if [ ! -z "$QVALS" ]; then
+    read -a RUNVALS <<< $QVALS
 fi
+if [ ${#RUNVALS[@]} = 0 ]; then
+    RUNVALS=${DFL_RUNVALS[@]}
+fi
+showinfo "QVALS" "${RUNVALS[@]}"
+
+### set values from the environment
+for i in MEMDIR RES RUN MULTI BUCKET S3DIR; do
+    setwithdefault $i
+done
+
+### make sure we can write to MEMDIR
 if touch "$MEMDIR"/testfile_ &>/dev/null ; then
     rm "$MEMDIR"/testfile_
 else
@@ -40,21 +60,29 @@ else
     exit 1
 fi
 
-if [ -z "$RES" ]; then
-    RES=1k
+### make sure we can find all the executables
+if ! which vpxenc &>/dev/null ; then
+    echo "ERROR: cannot find \`vpxenc\`"
+    exit 1
+fi
+if [ ! -x "$BASEDIR"/../daala_tools/dump_ssim ]; then
+    echo "You need to build the daala_tools submodule first!"
+    exit 1
 fi
 
-if [ -z "$RUN" ]; then
-    RUN=0
+### number of threads and token parts depends on the MULTI variable
+if [ "$MULTI" = 0 ]; then
+    NTH=1
+    TPT=0
+else
+    NTH=$NTHREADS
+    TPT=3
 fi
 
 for i in $(seq 0 $((${#RUNVALS[@]} - 1))); do
     QVAL=${RUNVALS[$i]}
-    ( echo "QUALITY:$QVAL"; echo "RUN:$RUN"; echo "NTHREADS:1"; time vpxenc --codec=vp8 --good --cpu-used=0 --end-usage=cq --min-q=0 --max-q=63 --cq-level=$QVAL --buf-initial-sz=10000 --buf-optimal-sz=20000 --buf-sz=40000 --undershoot-pct=100 --passes=2 --auto-alt-ref=1 --threads=1 --token-parts=0 --tune=ssim --target-bitrate=4294967295 -o "$MEMDIR"/out.ivf /mnt/exc_data/sintel-${RES}.y4m ) 2>&1 | "$BASEDIR"/clean_ansi.pl 2> run_${RES}_q${QVAL}_r${RUN}_n1.out
-    vpxdec --codec=vp8 -o "$OUTDIR"/out.y4m "$MEMDIR"/out.ivf
-    "$BASEDIR"/../daala_tools/dump_ssim /mnt/exc_data/sintel-${RES}.y4m "$OUTDIR"/out.y4m 2>&1 | tee -a run_${RES}_q${QVAL}_r${RUN}_n1.out
-
-    ( echo "QUALITY:$QVAL"; echo "RUN:$RUN"; echo "NTHREADS:$NTHREADS"; time vpxenc --codec=vp8 --good --cpu-used=0 --end-usage=cq --min-q=0 --max-q=63 --cq-level=$QVAL --buf-initial-sz=10000 --buf-optimal-sz=20000 --buf-sz=40000 --undershoot-pct=100 --passes=2 --auto-alt-ref=1 --threads=$NTHREADS --token-parts=3 --tune=ssim --target-bitrate=4294967295 -o "$MEMDIR"/out.ivf /mnt/exc_data/sintel-${RES}.y4m ) 2>&1 | "$BASEDIR"/clean_ansi.pl 2> run_${RES}_q${QVAL}_r${RUN}_n${NTHREADS}.out
-    vpxdec --codec=vp8 -o "$OUTDIR"/out.y4m "$MEMDIR"/out.ivf
-    "$BASEDIR"/../daala_tools/dump_ssim /mnt/exc_data/sintel-${RES}.y4m "$OUTDIR"/out.y4m 2>&1 | tee -a run_${RES}_q${QVAL}_r${RUN}_n${NTHREADS}.out
+    FBASE=run_${RES}_q${QVAL}_r${RUN}_n${NTH}
+    ( echo "QUALITY:$QVAL"; echo "RUN:$RUN"; echo "NTHREADS:1"; time vpxenc --codec=vp8 --good --cpu-used=0 --end-usage=cq --min-q=0 --max-q=63 --cq-level=$QVAL --buf-initial-sz=10000 --buf-optimal-sz=20000 --buf-sz=40000 --undershoot-pct=100 --passes=2 --auto-alt-ref=1 --threads="$NTH" --token-parts="$TPT" --tune=ssim --target-bitrate=4294967295 -o "$MEMDIR"/out.ivf /mnt/exc_data/sintel-${RES}.y4m ) 2>&1 | "$BASEDIR"/clean_ansi.pl 2> "$FBASE".out
+    aws s3 cp "$MEMDIR"/out.ivf s3://excamera-us-east-1/sintel-serial/"$FBASE".ivf
+    aws s3 cp "$FBASE".out s3://excamera-us-east-1/sintel-serial/"$FBASE".txt
 done
