@@ -111,7 +111,7 @@ for i in $(seq 0 $((${#RUNVALS[@]} - 1))); do
     vpxdec --codec=vp8 --threads=$NTHREADS -o "$OUTDIR"/out.y4m "$MEMDIR"/out.ivf
 
     # dump ssim
-    "$BASEDIR"/../daala_tools/dump_ssim -p $NTHREADS "$OUTDIR"/sintel-4k.y4m "$OUTDIR"/out.y4m > "$FBASE".out
+    "$BASEDIR"/../daala_tools/dump_ssim -p $(nproc) "$OUTDIR"/sintel-4k.y4m "$OUTDIR"/out.y4m > "$FBASE".out
 
     # upload result
     aws s3 cp "$FBASE".out s3://${BUCKET}/${S3DIR}/"$FBASE".ssim.txt
