@@ -74,11 +74,11 @@ fi
 
 ### set xterm title
 if [ "$MULTI" != 0 ]; then
-    MSTR="-multi"
+    MSTR="multi"
 else
-    MSTR=""
+    MSTR="single"
 fi
-echo -en "\033]0;"$(printf "%02d" $INSTNUM)"-sintel-${RES}-(${RUNVALS[@]})${MSTR}-${RUN}-ssim\a"
+echo -en "\033]0;"$(printf "%02d" $INSTNUM)"-sintel-${RES}-(${RUNVALS[@]})-${MSTR}-${RUN}-ssim\a"
 
 ### make sure we can find all the executables
 if ! which vpxdec &>/dev/null ; then
