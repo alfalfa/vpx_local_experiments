@@ -19,6 +19,7 @@ if [ "$1" = "-h" ]; then
     echo "  MULTI=<0 | 1>           run vpxenc multi-threaded (default: '"$DFL_MULTI"')"
     echo "  BUCKET=mybucket         s3 bucket for uploads (default: '"$DFL_BUCKET"')"
     echo "  S3DIR=mykey             s3 dirname for uploads (default: '"$DFL_S3DIR"')"
+    echo "  INSTNUM=num             instnum for xterm title (default: '"$DFL_INSTNUM"')"
     exit 0
 fi
 
