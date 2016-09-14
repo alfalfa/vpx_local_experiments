@@ -49,7 +49,7 @@ if [ ! -z "$QVALS" ]; then
     read -a RUNVALS <<< $QVALS
 fi
 if [ ${#RUNVALS[@]} = 0 ]; then
-    RUNVALS=${DFL_RUNVALS[@]}
+    RUNVALS=("${DFL_RUNVALS[@]}")
 fi
 showinfo "QVALS" "$(echo ${RUNVALS[@]})"
 
@@ -78,7 +78,7 @@ if [ "$MULTI" != 0 ]; then
 else
     MSTR=""
 fi
-echo -en "\033]0;"$(printf "%02d" $INSTNUM)"-sintel-${RES}-${RUNVALS[@]}${MSTR}-${RUN}\a"
+echo -en "\033]0;"$(printf "%02d" $INSTNUM)"-sintel-${RES}-(${RUNVALS[@]})${MSTR}-${RUN}-ssim\a"
 
 ### make sure we can find all the executables
 if ! which vpxdec &>/dev/null ; then
@@ -114,7 +114,7 @@ for i in $(seq 0 $((${#RUNVALS[@]} - 1))); do
     "$BASEDIR"/../daala_tools/dump_ssim -p $NTHREADS "$OUTDIR"/sintel-4k.y4m "$OUTDIR"/out.y4m > "$FBASE".out
 
     # upload result
-    aws s3 cp "$FBASE".out s3://${BUCKET}/sintel-serial/"$FBASE".ssim.txt
+    aws s3 cp "$FBASE".out s3://${BUCKET}/${S3DIR}/"$FBASE".ssim.txt
 
     # clean up
     rm "$MEMDIR"/out.ivf "$OUTDIR"/out.y4m
