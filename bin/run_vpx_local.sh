@@ -46,7 +46,7 @@ fi
 if [ ${#RUNVALS[@]} = 0 ]; then
     RUNVALS=${DFL_RUNVALS[@]}
 fi
-showinfo "QVALS" "${RUNVALS[@]}"
+showinfo "QVALS" "$(echo ${RUNVALS[@]})"
 
 ### set values from the environment
 for i in MEMDIR RES RUN MULTI BUCKET S3DIR INSTNUM; do
