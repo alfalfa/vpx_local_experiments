@@ -15,5 +15,5 @@ for i in $(seq 0 887); do
         rm /dev/shm/out
     fi
 done
-#sha1sum /mnt/exc_data/sintel-4k.y4m
 sha1sum -c <<< "698448854097b835c20e55d40fe99dc2a5a76bba  /mnt/exc_data/sintel-4k.y4m"
+#sha1sum /mnt/exc_data/sintel-4k.y4m
