@@ -353,16 +353,5 @@ void heap_swap(unsigned idx1, unsigned idx2, digest_heap *dheap) {
     memcpy(&temp, dheap->elems + idx1, sizeof(temp));
     memcpy(dheap->elems + idx1, dheap->elems + idx2, sizeof(temp)); 
     memcpy(dheap->elems + idx2, &temp, sizeof(temp));
-
-    /*
-    uint8_t *r1 = (uint8_t *)&(dheap->elems[idx1]);
-    uint8_t *r2 = (uint8_t *)&(dheap->elems[idx2]);
-    uint8_t tbyte;
-    for (unsigned i = 0; i < sizeof(dheap->elems[idx1]); i++) {
-        tbyte = r1[i];
-        r1[i] = r2[i];
-        r2[i] = tbyte;
-    }
-    */
 }
 
