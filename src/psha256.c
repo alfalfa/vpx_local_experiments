@@ -267,9 +267,9 @@ master_hash:
     }
 
     if (check_hash != NULL) {
-        bool check_passed = strncmp(out_string, check_hash, 2 * SHA256_DIGEST_LENGTH + 1) != 0;
-        printf("%s: %s\n", argv[optind], check_passed ? "FAILED" : "OK");
-        return check_passed ? 0 : 1;
+        bool check_failed = strncmp(out_string, check_hash, 2 * SHA256_DIGEST_LENGTH + 1) != 0;
+        printf("%s: %s\n", argv[optind], check_failed ? "FAILED" : "OK");
+        return check_failed ? 1 : 0;
     } else {
         printf("%s  %s\n", out_string, argv[optind]);
         return 0;
