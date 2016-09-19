@@ -39,7 +39,7 @@ typedef struct {
     digest_val *elems;
 } digest_heap;
 
-void initialize_heap(digest_heap *dheap, unsigned size);
+void realloc_heap(digest_heap *dheap, unsigned size);
 void insert_heap_element(unsigned cnum, unsigned char *data, digest_heap *dheap);
 void heap_swap(unsigned idx1, unsigned idx2, digest_heap *dheap);
 void heap_pop(digest_heap *dheap);
@@ -93,12 +93,13 @@ int main(int argc, char **argv) {
     unsigned nchunks = fdstat.st_size / WORKER_CHUNK_SIZE;
     unsigned lastlen = fdstat.st_size % WORKER_CHUNK_SIZE;
     if (npar < 2 || nchunks < 2) {
-        // too small a job, don't parallelize
-        npar = 0;
+        // refuse to proceed because we don't give the same result for -p 1 as -p n, n>1
+        fprintf(stderr, "%s does not (yet) support non-parallel hashing. Giving up.\n", argv[0]);
+        exit(1);
     }
 
-    digest_heap dheap = {0,};
-    initialize_heap(&dheap, npar);
+    digest_heap dheap = {0, 0, NULL};
+    realloc_heap(&dheap, npar);
     int *cpids = (int *)calloc(npar, sizeof(cpids[0]));
     int *pipes = (int *)calloc(npar, sizeof(pipes[0]));
     if (cpids == NULL || pipes == NULL) {
@@ -276,27 +277,20 @@ master_hash:
     }
 }
 
-void initialize_heap(digest_heap *dheap, unsigned size) {
-    dheap->elems = (digest_val *)calloc(size, sizeof(dheap->elems[0]));
+void realloc_heap(digest_heap *dheap, unsigned size) {
+    dheap->elems = (digest_val *)realloc(dheap->elems, size * sizeof(dheap->elems[0]));
     if (dheap->elems == NULL) {
         perror("Allocating value heap");
         exit(1);
     }
     dheap->size = size;
-    dheap->end = 0;
 }
 
 #define heap_lt(idx1, idx2) (dheap->elems[idx1].chunk_num < dheap->elems[idx2].chunk_num)
 void insert_heap_element(unsigned cnum, unsigned char *data, digest_heap *dheap) {
     // make sure we have enough space
     if (dheap->end >= dheap->size) {
-        dheap->size *= 2;
-        dheap->elems = (digest_val *)realloc(dheap->elems, sizeof(dheap->elems[0]) * dheap->size);
-        if (dheap->elems == NULL) {
-            perror("Growing digest heap");
-            kill(-2, SIGTERM);
-            exit(1);
-        }
+        realloc_heap(dheap, dheap->size * 2);
     }
 
     // construct the element
