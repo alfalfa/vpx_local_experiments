@@ -1,6 +1,9 @@
 #!/bin/bash
 
 NTHREADS=$(($(nproc)-1))
+if [ $NTHREADS -gt 64 ]; then
+    NTHREADS=64
+fi
 BASEDIR=$(readlink -f "$(dirname "$0")")
 
 DFL_RUNVALS=(0 4 7 11 14 18 21 25 28 32 35 39 42 46 49 53 56 60 63)

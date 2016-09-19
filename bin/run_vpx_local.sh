@@ -24,6 +24,9 @@ if [ "$1" = "-h" ]; then
 fi
 
 NTHREADS=$(($(nproc)-1))
+if [ $NTHREADS -gt 64 ]; then
+    NTHREADS=64
+fi
 BASEDIR=$(readlink -f "$(dirname "$0")")
 
 function showinfo {
