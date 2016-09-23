@@ -93,9 +93,7 @@ int main(int argc, char **argv) {
     unsigned nchunks = fdstat.st_size / WORKER_CHUNK_SIZE;
     unsigned lastlen = fdstat.st_size % WORKER_CHUNK_SIZE;
     if (npar < 2 || nchunks < 2) {
-        // refuse to proceed because we don't give the same result for -p 1 as -p n, n>1
-        fprintf(stderr, "%s does not (yet) support non-parallel hashing. Giving up.\n", argv[0]);
-        exit(1);
+        npar = 0;
     }
 
     digest_heap dheap = {0, 0, NULL};
@@ -116,98 +114,100 @@ int main(int argc, char **argv) {
     CHECK_CRYPTO(SHA256_Init(&master_ctx));
     unsigned chunk_num = 0;
 
-    while (npar != 0) {
+    while (npar > 0 || chunk_num < nchunks) {
         int child_num = -1;
 
-        if (launching & ! finishing) {
-            child_num = num_children++;
-            if (num_children == npar) {
-                launching = false;
-            }
-        } else {
-            int cstat;
-            pid_t cpid = wait(&cstat);
-            if (WIFEXITED(cstat) && (WEXITSTATUS(cstat) != 0)) {
-                fprintf(stderr, "Child exited abnormally.\n");
-                kill(-2, SIGTERM);
-                exit(1);
-            }
-
-            if (cpid < 0) {
-                // wait will return error if we have no children
-                if (errno == ECHILD) {
-                    // all done
-                    goto master_hash;
-                } else {
-                    // oops, real error
-                    perror("Wait error");
+        if (npar > 0) {
+            if (launching & ! finishing) {
+                child_num = num_children++;
+                if (num_children == npar) {
+                    launching = false;
+                }
+            } else {
+                int cstat;
+                pid_t cpid = wait(&cstat);
+                if (WIFEXITED(cstat) && (WEXITSTATUS(cstat) != 0)) {
+                    fprintf(stderr, "Child exited abnormally.\n");
                     kill(-2, SIGTERM);
                     exit(1);
                 }
-            }
 
-            // find child pid
-            for (child_num = 0; child_num < npar; child_num++) {
-                if (cpids[child_num] == cpid) {
-                    break;
+                if (cpid < 0) {
+                    // wait will return error if we have no children
+                    if (errno == ECHILD) {
+                        // all done
+                        goto master_hash;
+                    } else {
+                        // oops, real error
+                        perror("Wait error");
+                        kill(-2, SIGTERM);
+                        exit(1);
+                    }
+                }
+
+                // find child pid
+                for (child_num = 0; child_num < npar; child_num++) {
+                    if (cpids[child_num] == cpid) {
+                        break;
+                    }
+                }
+
+                // did we actually find a child?
+                if (child_num == npar) {
+                    fprintf(stderr, "Unexpected child pid death %d\n", cpid);
+                    kill(-2, SIGTERM);
+                    exit(1);
+                }
+
+                // read data from child
+                unsigned cnum;
+                unsigned char data[SHA256_DIGEST_LENGTH];
+                if ((read(pipes[child_num], &cnum, sizeof(cnum)) < 0) || (read(pipes[child_num], data, SHA256_DIGEST_LENGTH) < 0) ) {
+                    perror("Read from child failed");
+                    kill(-2, SIGTERM);
+                    exit(1);
+                } else {
+                    close(pipes[child_num]);
+                    insert_heap_element(cnum, data, &dheap);
+                }
+
+                if (finishing && (--num_children == 0)) {
+                    // no more children
+                    finished = true;
                 }
             }
 
-            // did we actually find a child?
-            if (child_num == npar) {
-                fprintf(stderr, "Unexpected child pid death %d\n", cpid);
+            if (child_num == -1) {
+                fprintf(stderr, "Somehow didn't find a child num. Giving up.\n");
                 kill(-2, SIGTERM);
                 exit(1);
             }
-
-            // read data from child
-            unsigned cnum;
-            unsigned char data[SHA256_DIGEST_LENGTH];
-            if ((read(pipes[child_num], &cnum, sizeof(cnum)) < 0) || (read(pipes[child_num], data, SHA256_DIGEST_LENGTH) < 0) ) {
-                perror("Read from child failed");
-                kill(-2, SIGTERM);
-                exit(1);
-            } else {
-                close(pipes[child_num]);
-                insert_heap_element(cnum, data, &dheap);
-            }
-
-            if (finishing && (--num_children == 0)) {
-                // no more children
-                finished = true;
-            }
-        }
-
-        if (child_num == -1) {
-            fprintf(stderr, "Somehow didn't find a child num. Giving up.\n");
-            kill(-2, SIGTERM);
-            exit(1);
-        }
 
 master_hash:
-        while ((dheap.end > 0) && ((last_chunk_seen + 1) == ((int) dheap.elems[0].chunk_num))) {
-            last_chunk_seen++;
-            CHECK_CRYPTO(SHA256_Update(&master_ctx, dheap.elems[0].digest, SHA256_DIGEST_LENGTH));
-            heap_pop(&dheap);
-        }
+            while ((dheap.end > 0) && ((last_chunk_seen + 1) == ((int) dheap.elems[0].chunk_num))) {
+                last_chunk_seen++;
+                CHECK_CRYPTO(SHA256_Update(&master_ctx, dheap.elems[0].digest, SHA256_DIGEST_LENGTH));
+                heap_pop(&dheap);
+            }
 
-        if (finished) {
-            break;
-        }
+            if (finished) {
+                break;
+            }
 
-        if (finishing) {
-            continue;
-        }
+            if (finishing) {
+                continue;
+            }
 
-        if (pipe(pnums) < 0) {
-            perror("Failed to open child pipe");
-            kill(-2, SIGTERM);
-            exit(1);
+            if (pipe(pnums) < 0) {
+                perror("Failed to open child pipe");
+                kill(-2, SIGTERM);
+                exit(1);
+            }
+            pipes[child_num] = pnums[0];
         }
-        pipes[child_num] = pnums[0];
 
         // parent forks
-        if ((cpids[child_num] = fork()) != 0) {
+        if (npar > 0 && (cpids[child_num] = fork()) != 0) {
             close(pnums[1]);
             if (++chunk_num >= nchunks) {
                 finishing = true;
@@ -226,7 +226,10 @@ master_hash:
             unsigned char out[SHA256_DIGEST_LENGTH];
             CHECK_CRYPTO(SHA256_Final(out, &sctx));
 
-            if ((write(pnums[1], &chunk_num, sizeof(chunk_num)) < 0) || (write(pnums[1], out, SHA256_DIGEST_LENGTH) < 0)) {
+            if (npar == 0) {
+                CHECK_CRYPTO(SHA256_Update(&master_ctx, out, SHA256_DIGEST_LENGTH));
+                ++chunk_num;
+            } else if ((write(pnums[1], &chunk_num, sizeof(chunk_num)) < 0) || (write(pnums[1], out, SHA256_DIGEST_LENGTH) < 0)) {
                 perror("Child write failed");
                 exit(1);
             } else {
