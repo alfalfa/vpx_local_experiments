@@ -6,7 +6,7 @@ if [ -z "$REGION" ]; then
     REGION=us-west-2
 fi
 
-if [ ! -x "${BASEDIR}"/../src/psha256 ]; then
+if [ ! -x "${BASEDIR}"/../psha256 ]; then
     echo "ERROR: please make first!"
     exit 1
 fi
