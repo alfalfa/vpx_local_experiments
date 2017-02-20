@@ -12,7 +12,7 @@ if [ ! -x "${BASEDIR}"/../psha256 ]; then
 fi
 
 cd /dev/shm
-for i in $(seq 0 834); do
+for i in $(seq 0 733); do
     NUM=$(printf "%08d.y4m" $i)
     HASH=$(echo -n $NUM | md5sum | cut -d \  -f 1)
 
