@@ -16,6 +16,7 @@ DFL_BUCKET=excamera-us-east-1
 DFL_S3DIR=sintel-serial
 DFL_INSTNUM=0
 DFL_RUNTHREADS=$NTHREADS
+DFL_VIDNAME=sintel
 
 if [ "$1" = "-h" ]; then
     echo "Usage: $0"
@@ -30,6 +31,7 @@ if [ "$1" = "-h" ]; then
     echo "  BUCKET=mybucket         s3 bucket for uploads (default: '"$DFL_BUCKET"')"
     echo "  S3DIR=mykey             s3 dirname for uploads (default: '"$DFL_S3DIR"')"
     echo "  INSTNUM=num             instnum for xterm title (default: '"$DFL_INSTNUM"')"
+    echo "  VIDNAME=name            name of video (default: '"$DFL_VIDNAME"')"
     exit 0
 fi
 
@@ -57,7 +59,7 @@ fi
 showinfo "QVALS" "$(echo ${RUNVALS[@]})"
 
 ### set values from the environment
-for i in MEMDIR OUTDIR RES RUN MULTI RUNTHREADS BUCKET S3DIR INSTNUM; do
+for i in MEMDIR OUTDIR RES RUN MULTI RUNTHREADS BUCKET S3DIR INSTNUM VIDNAME; do
     setwithdefault $i
 done
 
@@ -81,7 +83,7 @@ if [ "$MULTI" != 0 ]; then
 else
     MSTR="single"
 fi
-echo -en "\033]0;"$(printf "%02d" $INSTNUM)"-sintel-${RES}-(${RUNVALS[@]})-${MSTR}-${RUN}-ssim\a"
+echo -en "\033]0;"$(printf "%02d" $INSTNUM)"-${VIDNAME}-${RES}-(${RUNVALS[@]})-${MSTR}-${RUN}-ssim\a"
 
 ### make sure we can find all the executables
 if ! which vpxdec &>/dev/null ; then
@@ -114,7 +116,7 @@ for i in $(seq 0 $((${#RUNVALS[@]} - 1))); do
     vpxdec --codec=vp8 --threads=$NTHREADS -o "$OUTDIR"/out.y4m "$MEMDIR"/out.ivf
 
     # dump ssim
-    "$BASEDIR"/../daala_tools/dump_ssim -p $(nproc) "$OUTDIR"/sintel-4k.y4m "$OUTDIR"/out.y4m > "$FBASE".out
+    "$BASEDIR"/../daala_tools/dump_ssim -p $(nproc) "$OUTDIR"/${VIDNAME}-${RES}.y4m "$OUTDIR"/out.y4m > "$FBASE".out
 
     # upload result
     aws s3 cp "$FBASE".out s3://${BUCKET}/${S3DIR}/"$FBASE".ssim.txt
