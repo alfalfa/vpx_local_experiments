@@ -44,10 +44,15 @@ for folder in folders:
         print "WARNING: %s does not seem to exist" % folder
         continue
 
-    if (folder[0] is "t"):
+    if folder[0] is "t":
         length = 734
     else:
         length = 888
+
+    if folder[-1] is "6":
+        length *= 4
+    elif folder[-1] is "2":
+        length *= 2
 
     for vidnum in range(0, length):
         vidname = "%08d.y4m" % vidnum
